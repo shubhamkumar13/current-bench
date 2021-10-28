@@ -29,6 +29,8 @@ depends: [
   "postgresql"
   "rresult"
   "omigrate"
+  "conf-libpcre"
+  "pcre"
 ]
 
 build: [

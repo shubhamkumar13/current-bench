@@ -2,4 +2,4 @@
  (name main)
  (public_name pipeline)
  (package pipeline)
- (libraries pipeline bos cmdliner fmt.cli logs.cli current_github))
+ (libraries pipeline bos cmdliner fmt.cli logs.cli current_github pcre))
