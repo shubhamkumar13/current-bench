@@ -6,31 +6,9 @@ module Docker_util = Current_util.Docker_util
 module Slack = Current_slack
 module Logging = Logging
 module Benchmark = Models.Benchmark
+module Json_util = Json_util
 
 let ( >>| ) x f = Current.map f x
-
-let get_benchmark_name json =
-  json |> Yojson.Safe.Util.(member "name") |> Yojson.Safe.Util.to_string_option
-
-let get_result_list json =
-  json |> Yojson.Safe.Util.(member "results") |> Yojson.Safe.Util.to_list
-
-let validate_json json_list =
-  let tbl = Hashtbl.create 1000 in
-  List.iter
-    (fun json ->
-      let benchmark_name = get_benchmark_name json in
-      match Hashtbl.find_opt tbl benchmark_name with
-      | Some _ ->
-          raise
-          @@ Failure
-               "This benchmark name already exists, please create a unique name"
-      | None ->
-          let results = get_result_list json in
-          Hashtbl.add tbl benchmark_name results)
-    json_list;
-  tbl
-
 module Source = struct
   type github = {
     token : Fpath.t;
@@ -115,7 +93,7 @@ let db_save ~conninfo benchmark output =
   let db = new Postgresql.connection ~conninfo () in
   output
   |> Json_util.parse_many
-  |> validate_json
+  |> Json_util.validate_json
   |> Hashtbl.iter (fun benchmark_name results ->
          results
          |> List.map (benchmark ~benchmark_name)
