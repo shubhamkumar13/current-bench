@@ -11,7 +11,8 @@ RUN sudo apt-get update && \
     graphviz \
     capnproto \
     libsqlite3-dev \
-    libcapnp-dev
+    libcapnp-dev \
+    libpcre3-dev
 
 WORKDIR /mnt/project
 
