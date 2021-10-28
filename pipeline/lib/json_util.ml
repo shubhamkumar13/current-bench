@@ -41,7 +41,7 @@ let get_complete_match rex str =
   | None -> raise @@ Failure "no complete match found"
   | Some s -> s
 
-let parse_pread_log (s : string Current.t) : string Current.t = 
+let check_pread_log (s : string Current.t) : string Current.t = 
   let* s = s in
   let r = Re.regexp {|\{(?:[^{}]|(\{(?:[^{}]|(\{(?:[^{}]|())+\}))+\}))+\}|} in
   Current.return (get_complete_match r s)
