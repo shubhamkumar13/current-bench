@@ -115,6 +115,7 @@ let docker_make_bench ~run_args ~repository image =
         "-c";
         "eval $(opam env) && make bench";
       ]
+  |> Json_util.check_pread_log
 
 let pipeline ~conninfo ~run_args ~repository =
   let src = Repository.src repository in
