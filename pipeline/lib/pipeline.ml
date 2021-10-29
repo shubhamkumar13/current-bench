@@ -9,6 +9,7 @@ module Benchmark = Models.Benchmark
 module Json_util = Json_util
 
 let ( >>| ) x f = Current.map f x
+
 module Source = struct
   type github = {
     token : Fpath.t;
@@ -115,7 +116,6 @@ let docker_make_bench ~run_args ~repository image =
         "-c";
         "eval $(opam env) && make bench";
       ]
-  |> Json_util.check_pread_log
 
 let pipeline ~conninfo ~run_args ~repository =
   let src = Repository.src repository in
