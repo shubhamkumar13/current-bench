@@ -1,4 +1,18 @@
 open Current.Syntax
+module Re = Pcre
+
+let json_regexp = Re.regexp {|\{(?:[^{}]|(\{(?:[^{}]|(\{(?:[^{}]|())+\}))+\}))+\}|}
+
+let get_regex_matches rex str =
+  Re.exec_all ~rex str
+  |> Array.map @@ Re.get_opt_substrings ~full_match:true
+
+let get_regex_complete_match rex str =
+  let arr = get_regex_matches rex str in
+  (* first match is the substring with absolute regexp match *)
+  match arr.(0).(0) with
+  | None -> raise @@ Failure "no complete match found"
+  | Some s -> s
 
 let get_job_id x =
   let+ md = Current.Analysis.metadata x in
@@ -98,6 +112,8 @@ module Docker_util = struct
       >>= fun () ->
       Current.Process.check_output ~cancellable:true ~job (Key.cmd key)
       >>= fun output_result ->
+      let output_result = 
+        Result.map (get_regex_complete_match json_regexp) output_result in
       match output_result with
       | Ok output ->
           Current.Job.log job "Output:\n%s" output;
