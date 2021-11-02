@@ -9,9 +9,39 @@ type testMetrics = {
 
 @module("../icons/branch.svg") external branchIcon: string = "default"
 
-let decodeMetricValue = (json): LineGraph.DataRow.value => {
+let formatSize = (value, units) => {
+  let integralSize = (x) => {
+      let str = Js.Float.toString(x)
+      let decimalIndex =
+          switch Js.String.indexOf(".", str) {
+          | -1 => Js.String.length(str)
+          |  n =>  n
+      }
+      Js.String.substring(~from=0, ~to_=decimalIndex, str)->Js.String.length
+  }
+
+  let truncate = (unit, v) => {
+    let len = integralSize(v)
+    let exp = Js.Int.toFloat(len / 3)
+    let divisor = Js.Math.pow_float(~base=1000.0, ~exp=exp)
+    let unitArr = ["bytes", "kb", "mb", "gb", "tb", "pb", "eb", "zb", "yb"]
+    switch units {
+        | "bytes" => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp)), v /. divisor)
+        | "kb"    => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp) + 1), v /. divisor)
+        | "mb"    => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp) + 2), v /. divisor)
+        | "gb"    => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp) + 3), v /. divisor)
+        | _       => invalid_arg("This size is not supported")
+    }
+  }
+  switch Js.String.match_(%re("/(gb|mb|kb|b|bytes)\w*/i"), units) {
+  | Some(unit) => truncate(JS.Array.unsafe_get(unit, 0), value)
+  | None => value
+  }
+}
+
+let decodeMetricValue = (json, units): LineGraph.DataRow.value => {
   switch Js.Json.classify(json) {
-  | JSONNumber(n) => LineGraph.DataRow.single(n)
+  | JSONNumber(n) => n->formatSize(units)->LineGraph.DataRow.single
   | JSONArray([]) => LineGraph.DataRow.single(nan)
   | JSONArray(xs) =>
     let xs = xs->Belt.Array.map(x => x->Js.Json.decodeNumber->Belt.Option.getExn)
@@ -36,10 +66,14 @@ let decodeMetricValue = (json): LineGraph.DataRow.value => {
 }
 
 let decodeMetric = (data): LineGraph.DataRow.metric => {
+  let name = (Js.Dict.get(data, "name")->Belt.Option.getExn->Js.Json.decodeString->Belt.Option.getExn)
+  let units = (Js.Dict.get(data, "units")->Belt.Option.getExn->Js.Json.decodeString->Belt.Option.getExn)
+  let value = (Js.Dict.get(data, "value")->Belt.Option.getExn->decodeMetricValue(units))
+  // let (units, value) = formatSize(units, value)
   {
-    name: (Js.Dict.get(data, "name")->Belt.Option.getExn->Js.Json.decodeString->Belt.Option.getExn),
-    value: decodeMetricValue(Js.Dict.get(data, "value")->Belt.Option.getExn),
-    units: (Js.Dict.get(data, "units")->Belt.Option.getExn->Js.Json.decodeString->Belt.Option.getExn),
+    name: name,
+    value: value,
+    units: units,
   }
 }
 
