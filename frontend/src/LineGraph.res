@@ -52,7 +52,7 @@ module DataRow = {
   type metric = {name, value, units}
   type t = array<value>
 
-  let single = (x: float): value =>
+  let single = (x: string): value =>
     Obj.magic([Obj.magic(Js.null), Obj.magic(x), Obj.magic(Js.null)])
 
   let many = (xs: array<float>): value => {

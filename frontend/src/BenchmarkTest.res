@@ -9,42 +9,26 @@ type testMetrics = {
 
 @module("../icons/branch.svg") external branchIcon: string = "default"
 
-let formatSize = (units, value) => {
-  let integralSize = (x) => {
-      let str = Js.Float.toString(x)
-      let decimalIndex =
-          switch Js.String.indexOf(".", str) {
-            | -1 => Js.String.length(str)
-            |  n =>  n
-      }
-      Js.String.substring(~from=0, ~to_=decimalIndex, str)->Js.String.length
-  }
-
-  let truncate = (unit, v) => {
-    let len = integralSize(v)
-    let exp = Js.Int.toFloat(len / 3)
-    let divisor = Js.Math.pow_float(~base=1000.0, ~exp=exp)
-    let unitArr = ["bytes", "kb", "mb", "gb", "tb", "pb", "eb", "zb", "yb"]
-    switch units {
-      | "bytes" => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp)), v /. divisor)
-      | "kb"    => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp) + 1), v /. divisor)
-      | "mb"    => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp) + 2), v /. divisor)
-      | "gb"    => (Belt.Array.getExn(unitArr, Belt.Float.toInt(exp) + 3), v /. divisor)
-      | _       => invalid_arg("This size is not supported")
-    }
-  }
-  let (newUnit, newValue) = switch Js.String.match_(%re("/(gb|mb|kb|b|bytes)\w*/i"), units) {
-    | Some(unit) => truncate(Belt.Array.getExn(unit, 0), value)
-    | None => (units, value)
-  }
-
-  (Js.String.replaceByRe(%re("/(gb|mb|kb|b|bytes)\w*/i"), newUnit, units), newValue)
+let formatSize = (f:float) : string => {
+  let str = Js.Float.toExponential(f)
+  let exp_ = Js.String.split("e", str) -> Belt.Array.getExn(1)
+  let integral_ = Js.String.split("e", str) -> Belt.Array.getExn(0)
+  let sign = Js.String.get(exp_, 0)
+  let exp = ((Js.String.get(exp_, 1)->Belt.Int.fromString->Belt.Option.getExn) - 1)->Belt.Int.toString
+  let integral = (Belt.Float.fromString(integral_) -> Belt.Option.map((x) => x *. 10.0) -> Belt.Option.getExn) -> Js.Float.toFixedWithPrecision(~digits=2)
+  Js.String.concatMany([integral,"e",sign,exp], "")
 }
 
 let decodeMetricValue = (json, units): LineGraph.DataRow.value => {
   switch Js.Json.classify(json) {
-  | JSONNumber(n) => LineGraph.DataRow.single(n)
-  | JSONArray([]) => LineGraph.DataRow.single(nan)
+  | JSONNumber(n) => {
+      switch Js.String.match_(%re("/(gb|mb|kb|b|bytes)\w*/i"), units) {
+        | Some(_) => formatSize(n)->LineGraph.DataRow.single
+
+        | None => Belt.Float.toString(n)->LineGraph.DataRow.single
+    }
+  }
+  | JSONArray([]) => Belt.Float.toString(nan)->LineGraph.DataRow.single
   | JSONArray(xs) =>
     let xs = xs->Belt.Array.map(x => x->Js.Json.decodeNumber->Belt.Option.getExn)
     LineGraph.DataRow.many(xs)
@@ -55,11 +39,11 @@ let decodeMetricValue = (json, units): LineGraph.DataRow.value => {
     ) {
     | Some([_, minutes, seconds]) =>
       if minutes == "" {
-        let n = Js.Float.fromString(seconds)
-        LineGraph.DataRow.single(n)
+        // let n = Js.Float.fromString(seconds)
+        LineGraph.DataRow.single(seconds)
       } else {
         let n = Js.Float.fromString(minutes) *. 60.0 +. Js.Float.fromString(seconds)
-        LineGraph.DataRow.single(n)
+        Belt.Float.toString(n)->LineGraph.DataRow.single
       }
     | _ => invalid_arg("Invalid metric value:" ++ Js.Json.stringify(json))
     }
@@ -70,8 +54,8 @@ let decodeMetricValue = (json, units): LineGraph.DataRow.value => {
 let decodeMetric = (data): LineGraph.DataRow.metric => {
   let name = (Js.Dict.get(data, "name")->Belt.Option.getExn->Js.Json.decodeString->Belt.Option.getExn)
   let units = (Js.Dict.get(data, "units")->Belt.Option.getExn->Js.Json.decodeString->Belt.Option.getExn)
-  let value = (Js.Dict.get(data, "value")->Belt.Option.getExn->decodeMetricValue)
-  let (units, value) = formatSize(units, value)
+  let value = (Js.Dict.get(data, "value")->Belt.Option.getExn->decodeMetricValue(units))
+  
   {
     name: name,
     value: value,
